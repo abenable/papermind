@@ -1,5 +1,5 @@
 # Use the official Bun image for minimal size and incredible speed
-FROM oven/bun:1.1-alpine AS deps
+FROM oven/bun:1.3.10-alpine AS deps
 WORKDIR /app
 
 # Install dependencies
@@ -7,7 +7,7 @@ COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
 
 # Rebuild the source code only when needed
-FROM oven/bun:1.1-alpine AS builder
+FROM oven/bun:1.3.10-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -20,7 +20,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN bun run build
 
 # Production image, copy all the files and run next
-FROM oven/bun:1.1-alpine AS runner
+FROM oven/bun:1.3.10-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
