@@ -1,0 +1,42 @@
+name: papermind
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: papermind-backend
+    restart: unless-stopped
+    # Port 8000 is exposed ONLY to the internal Docker network, completely hidden from the outside world
+    expose:
+      - "8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    networks:
+      - papermind-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: papermind-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Next.js will proxy browser requests directly to the internal backend container
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - papermind-network
+
+networks:
+  papermind-network:
+    driver: bridge
