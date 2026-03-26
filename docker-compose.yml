@@ -7,9 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: papermind-backend
     restart: unless-stopped
-    # Port 8000 is exposed ONLY to the internal Docker network, completely hidden from the outside world
-    expose:
-      - "8000"
+    ports:
+      - "8022:8000"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     networks:
