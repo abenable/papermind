@@ -1,5 +1,6 @@
 import logging
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from app.core.exceptions import DocumentAnalysisError
 from app.services.gemini_service import analyze_document
 from app.models.schemas import AnalysisResponse
 
@@ -12,11 +13,12 @@ SUPPORTED_MIME_TYPES = {
 }
 
 MAX_FILE_SIZE = 15 * 1024 * 1024  # 15 MB limit for Gemini
+DEFAULT_PROMPT = "Please summarize this document comprehensively."
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def upload_and_analyze(
     file: UploadFile = File(...),
-    prompt: str = Form("Please summarize this document comprehensively.")
+    prompt: str = Form(DEFAULT_PROMPT)
 ):
     if not file:
         raise HTTPException(status_code=400, detail="No file was uploaded.")
@@ -29,6 +31,7 @@ async def upload_and_analyze(
 
     try:
         file_bytes = await file.read()
+        normalized_prompt = prompt.strip() or DEFAULT_PROMPT
         
         if len(file_bytes) == 0:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
@@ -39,17 +42,21 @@ async def upload_and_analyze(
                 detail=f"File too large. Maximum allowed size is 15MB. (Your file: {len(file_bytes) // (1024*1024)}MB)"
             )
         
-        logger.info(f"Analyzing {file.filename} ({len(file_bytes)} bytes) with prompt: {prompt}")
-        
-        # Analyze the document
+        logger.info(
+            "Analyzing %s (%s bytes) with prompt length %s",
+            file.filename,
+            len(file_bytes),
+            len(normalized_prompt),
+        )
+
         summary = await analyze_document(
             file_bytes=file_bytes,
             mime_type=file.content_type,
-            prompt=prompt
+            prompt=normalized_prompt,
         )
-        
-        logger.info(f"Successfully analyzed {file.filename}")
-        
+
+        logger.info("Successfully analyzed %s", file.filename)
+
         return AnalysisResponse(
             summary=summary,
             metadata={
@@ -61,14 +68,17 @@ async def upload_and_analyze(
     except HTTPException:
         # Re-raise HTTP exceptions to be handled by FastAPI
         raise
-    except ValueError as e:
-        logger.warning(f"Validation error during analysis: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Gemini Analysis failed for {file.filename}: {error_msg}", exc_info=True)
-        
-        if "API_KEY_INVALID" in error_msg or "API key not valid" in error_msg:
-            raise HTTPException(status_code=401, detail="Invalid Gemini API Key. Please update the .env file in your backend folder with a real API key.")
-        
-        raise HTTPException(status_code=502, detail="Failed to analyze document with the AI service. The document may be corrupted, too large, or the service is temporarily unavailable.")
+    except ValueError as exc:
+        logger.warning("Validation error during analysis: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DocumentAnalysisError as exc:
+        logger.error("Analysis failed for %s: %s", file.filename, exc.message, exc_info=True)
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except Exception as exc:
+        logger.error("Unexpected analysis failure for %s", file.filename, exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to analyze document with the AI service.",
+        ) from exc
+    finally:
+        await file.close()

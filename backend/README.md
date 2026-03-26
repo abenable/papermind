@@ -20,6 +20,8 @@ This is the FastAPI backend for PaperMind. It provides endpoints for analyzing d
    ```bash
    cp .env.example .env
    ```
+   Optional:
+   - Set `BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000` for local frontend access.
 
 3. Run the development server:
    ```bash

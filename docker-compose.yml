@@ -7,10 +7,10 @@ services:
       dockerfile: Dockerfile
     container_name: papermind-backend
     restart: unless-stopped
-    ports:
-      - "8022:8000"
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - ./backend/.env
+    expose:
+      - "8000"
     networks:
       - papermind-network
     healthcheck:
@@ -27,9 +27,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      # Next.js will proxy browser requests directly to the internal backend container
-      - BACKEND_URL=https://api-papermind.byte10x.dev
+    env_file:
+      - ./frontend/.env
     depends_on:
       backend:
         condition: service_healthy
