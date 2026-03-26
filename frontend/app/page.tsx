@@ -60,7 +60,7 @@ export default function Home() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://backend:8000" || "http://127.0.0.1:8000"}/health`,
+          `${process.env.BACKEND_URL || "https://api.papermind.byte10x.dev" || "http://127.0.0.1:8000"}/health`,
           { signal: controller.signal },
         );
         clearTimeout(timeoutId);
@@ -118,13 +118,10 @@ export default function Home() {
     formData.append("prompt", prompt);
 
     try {
-      const res = await fetch(
-        "/api/v1/documents/analyze",
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+      const res = await fetch("/api/v1/documents/analyze", {
+        method: "POST",
+        body: formData,
+      });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
