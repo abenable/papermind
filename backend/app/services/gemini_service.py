@@ -2,10 +2,12 @@ from google import genai
 from google.genai import types
 
 from app.core.config import settings
+from app.core.exceptions import DocumentAnalysisError
 from app.services.document_parser import extract_text_from_docx
 
-# Initialize client using API key from settings
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+def get_client() -> genai.Client:
+    return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
 async def analyze_document(
@@ -27,14 +29,22 @@ async def analyze_document(
         text_content = extract_text_from_docx(file_bytes)
         contents.append(text_content)
     else:
-        raise ValueError(f"Unsupported file type: {mime_type}")
+        raise DocumentAnalysisError(f"Unsupported file type: {mime_type}", 415)
 
     contents.append(prompt)
 
     try:
-        response = await client.aio.models.generate_content(
+        response = await get_client().aio.models.generate_content(
             model="gemini-3.1-flash-lite-preview", contents=contents
         )
-        return response.text
-    except Exception as e:
-        raise RuntimeError(f"Failed to generate content: {str(e)}")
+    except Exception as exc:
+        raise DocumentAnalysisError(
+            "The AI service request failed. Please try again."
+        ) from exc
+
+    if not response.text:
+        raise DocumentAnalysisError(
+            "The AI service returned an empty response. Please try again."
+        )
+
+    return response.text

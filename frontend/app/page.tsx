@@ -42,38 +42,49 @@ interface AnalysisResponse {
   };
 }
 
+const DEFAULT_PROMPT = "Please summarize this document comprehensively.";
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
+
+async function readErrorMessage(response: Response) {
+  try {
+    const payload = (await response.json()) as { detail?: string };
+    if (payload.detail) {
+      return payload.detail;
+    }
+  } catch {
+    // Fall back to a generic error when the proxy returns a non-JSON response.
+  }
+
+  return `Request failed with status ${response.status}.`;
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<
-    "idle" | "uploading" | "analyzing" | "success" | "error"
-  >("idle");
+  const [status, setStatus] = useState<"idle" | "analyzing" | "success" | "error">("idle");
   const [result, setResult] = useState<AnalysisResponse | null>(null);
-  const [promptText, setPromptText] = useState(
-    "Please summarize this document comprehensively.",
-  );
+  const [promptText, setPromptText] = useState(DEFAULT_PROMPT);
   const [isBackendOnline, setIsBackendOnline] = useState<boolean | null>(null);
 
-  // Health check polling
   useEffect(() => {
     const checkHealth = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(
-          `${process.env.BACKEND_URL || "https://api-papermind.byte10x.dev" || "http://127.0.0.1:8000"}/health`,
-          { signal: controller.signal },
-        );
-        clearTimeout(timeoutId);
+        const res = await fetch("/health", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         setIsBackendOnline(res.ok);
-      } catch (e) {
+      } catch {
         setIsBackendOnline(false);
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
-    // Initial check
     checkHealth();
 
-    // Poll every 60 seconds
     const intervalId = setInterval(checkHealth, 60000);
     return () => clearInterval(intervalId);
   }, []);
@@ -94,6 +105,11 @@ export default function Home() {
         return;
       }
 
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        toast.error("File too large. Please upload a PDF or DOCX under 15MB.");
+        return;
+      }
+
       setFile(selectedFile);
       await handleUpload(selectedFile, promptText);
     },
@@ -111,11 +127,12 @@ export default function Home() {
   });
 
   const handleUpload = async (fileToUpload: File, prompt: string) => {
+    setResult(null);
     setStatus("analyzing");
 
     const formData = new FormData();
     formData.append("file", fileToUpload);
-    formData.append("prompt", prompt);
+    formData.append("prompt", prompt.trim() || DEFAULT_PROMPT);
 
     try {
       const res = await fetch("/api/v1/documents/analyze", {
@@ -124,17 +141,22 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || "Analysis failed");
+        if (res.status === 503 || res.status === 504) {
+          setIsBackendOnline(false);
+        }
+
+        throw new Error(await readErrorMessage(res));
       }
 
       const data: AnalysisResponse = await res.json();
       setResult(data);
       setStatus("success");
+      setIsBackendOnline(true);
       toast.success("Analysis complete");
     } catch (err: unknown) {
       console.error(err);
       setStatus("error");
+      setIsBackendOnline(false);
       toast.error(
         err instanceof Error
           ? err.message

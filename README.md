@@ -1,77 +1,139 @@
 # PaperMind
 
-PaperMind is an elegant, full-stack application that transforms complex PDF and DOCX documents into actionable insights using Google's state-of-the-art Gemini 2.5 Flash AI model.
+PaperMind is a full-stack document analysis app for PDF and DOCX files. Users upload a document, provide an optional analysis prompt, and receive a structured AI-generated summary in the browser.
 
-Built with a sophisticated, editorial-style React frontend and a lightning-fast, highly scalable FastAPI backend.
+The stack uses a Next.js frontend and a FastAPI backend, with Gemini handling the document analysis.
 
-## 🌟 Features
+## Features
 
-- **Beautiful UI:** A refined, editorial aesthetic built with Next.js, Tailwind CSS v4, and Framer Motion.
-- **Smart Document Processing:** Drag-and-drop support for `.pdf` and `.docx` files with pre-flight size validation (<15MB).
-- **Custom Directives:** Instruct the AI exactly how you want your document analyzed (e.g., summarize, extract tables, translate).
-- **Real-time Health Monitoring:** The frontend continuously polls the backend and provides a dynamic system status indicator.
-- **Production-Ready Architecture:** 
-  - FastAPI backend handles asynchronous LLM streaming and strict error logging.
-  - Next.js acts as a seamless reverse proxy for internal Docker routing, eliminating CORS and exposing only the frontend to the public internet.
+- Drag-and-drop upload for `.pdf` and `.docx` files
+- Custom analysis prompts
+- Health status indicator in the frontend
+- Server-side proxying from Next.js to FastAPI
+- Env-based configuration for local and Docker setups
+- Improved validation and clearer request failure messages
 
-## 🏗️ Architecture & Deployment
+## Architecture
 
-The application is fully containerized and orchestrated via Docker Compose.
+The app has two services:
 
-- **Frontend:** Next.js 16 (React 19) built on a minimal multi-stage Bun Alpine image.
-- **Backend:** Python 3.10 FastAPI built with Astral's `uv` package manager for ultra-fast dependency resolution.
-- **Networking:** The backend runs on a private Docker bridge network. The frontend securely proxies `/api` and `/health` requests directly to the backend container, meaning port `8000` is never exposed to the outside world.
+- `frontend/`: Next.js 16 on Bun
+- `backend/`: FastAPI on Python 3.10 with `uv`
 
-## 🚀 Getting Started Locally
+Browser requests never call the backend host directly. The frontend sends requests to its own route handlers at `/api/v1/documents/analyze` and `/health`, and those route handlers proxy the request to the backend using the server-side `BACKEND_URL` env var. That keeps backend addresses out of browser code and makes Docker networking simpler.
 
-### Prerequisites
+In Docker, the frontend should use `http://backend:8000`. For local development, the frontend should use `http://127.0.0.1:8000`.
+
+## Prerequisites
+
 - Docker & Docker Compose
+- Bun
+- Python 3.10+
+- `uv`
 - A Google Gemini API Key
 
-### Installation
+## Run With Docker
 
-1. **Clone the repository**
+1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/papermind.git
+   git clone git@github.com:abenable/papermind.git
    cd papermind
    ```
 
-2. **Configure Environment Variables**
-   Copy the example environment file:
+2. Create the backend env file:
    ```bash
-   cp .env.example .env
+   cp backend/.env.example backend/.env
    ```
-   Open `.env` and insert your real Gemini API key:
+   Set your Gemini API key in `backend/.env`:
    ```env
-   GEMINI_API_KEY=AIzaSyYourRealApiKeyHere
+   GEMINI_API_KEY=your-gemini-api-key
    ```
 
-3. **Spin up the stack**
+3. Create the frontend env file:
+   ```bash
+   cp frontend/.env.example frontend/.env
+   ```
+
+4. Start the stack:
    ```bash
    docker compose up --build -d
    ```
 
-4. **Access the application**
-   Open your browser and navigate to: **http://localhost:3000**
+5. Open `http://localhost:3000`.
 
-## 🌐 Production Deployment
+The backend is only exposed on the internal Docker network. The only public port in this setup is the frontend on `3000`.
 
-If you are deploying this to a VPS (e.g., DigitalOcean, Hetzner, AWS EC2):
+## Run Locally Without Docker
 
-1. Point your domain (**papermind.byte10x.dev**) to your server's IP address.
-2. Clone the repository onto your server.
-3. Configure your `.env` file with your `GEMINI_API_KEY`.
-4. Run `docker compose up --build -d`.
-5. Set up a reverse proxy (like Nginx, Caddy, or Traefik) to route incoming HTTPS traffic on port 443 to the frontend container running on `localhost:3000`.
+1. Set up the backend env:
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
 
-Because the frontend internally proxies the backend via Docker's bridge network, **you only need to expose port 3000 to your reverse proxy.** The FastAPI backend remains entirely shielded from the public internet.
+2. Start the backend:
+   ```bash
+   cd backend
+   uv sync
+   uv run fastapi dev main.py
+   ```
 
-## 🛠️ Built With
+3. Set up frontend env for local development:
+   ```bash
+   cp frontend/.env.example frontend/.env.local
+   ```
+   Then set:
+   ```env
+   BACKEND_URL=http://127.0.0.1:8000
+   ```
+
+4. Start the frontend:
+   ```bash
+   cd frontend
+   bun install
+   bun run dev
+   ```
+
+5. Open `http://localhost:3000`.
+
+## Environment Variables
+
+### `backend/.env`
+
+```env
+GEMINI_API_KEY=your-gemini-api-key
+BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+```
+
+### `frontend/.env` for Docker
+
+```env
+BACKEND_URL=http://backend:8000
+```
+
+### `frontend/.env.local` for local frontend development
+
+```env
+BACKEND_URL=http://127.0.0.1:8000
+```
+
+## Error Handling
+
+- The frontend validates supported file types and file size before upload.
+- Next.js proxy routes return `503` or `504` when the backend is unavailable or times out.
+- The backend validates MIME type, file size, empty files, unreadable DOCX files, and empty extracted text.
+- Backend errors are converted into consistent JSON responses with a `detail` message.
+
+## Verification
+
+The current setup has been verified with:
+
+- `bun run lint`
+- `bun run build`
+- `uv run python -m compileall app main.py`
+
+## Stack
 
 - [Next.js 16](https://nextjs.org/)
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [Google Gemini API](https://aistudio.google.com/)
-- [Tailwind CSS v4](https://tailwindcss.com/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [shadcn/ui](https://ui.shadcn.com/)
 - [Bun](https://bun.sh/) & [uv](https://github.com/astral-sh/uv)
