@@ -29,7 +29,7 @@ services:
       - "3000:3000"
     environment:
       # Next.js will proxy browser requests directly to the internal backend container
-      - BACKEND_URL=https://api.papermind.byte10x.dev
+      - BACKEND_URL=https://api-papermind.byte10x.dev
     depends_on:
       backend:
         condition: service_healthy
