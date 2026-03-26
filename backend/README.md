@@ -19,10 +19,11 @@ Supported variables:
 
 ```env
 GEMINI_API_KEY=your-gemini-api-key
-BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://papermind.byte10x.dev
 ```
 
 `GEMINI_API_KEY` is required.
+`BACKEND_CORS_ORIGINS` should include every frontend origin that will call the API from a browser.
 
 ## Local Development
 
