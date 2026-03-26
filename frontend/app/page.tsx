@@ -119,7 +119,7 @@ export default function Home() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://backend:8000" || "http://127.0.0.1:8000"}/api/v1/documents/analyze`,
+        "/api/v1/documents/analyze",
         {
           method: "POST",
           body: formData,
