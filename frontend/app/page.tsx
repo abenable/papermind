@@ -60,7 +60,7 @@ export default function Home() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         const res = await fetch(
-          `${process.env.BACKEND_URL || "https://api.papermind.byte10x.dev" || "http://127.0.0.1:8000"}/health`,
+          `${process.env.BACKEND_URL || "https://api-papermind.byte10x.dev" || "http://127.0.0.1:8000"}/health`,
           { signal: controller.signal },
         );
         clearTimeout(timeoutId);
