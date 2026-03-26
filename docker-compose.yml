@@ -9,8 +9,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
-    expose:
-      - "8000"
+    ports:
+      - "8022:8000"
     networks:
       - papermind-network
     healthcheck:
