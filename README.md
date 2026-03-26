@@ -9,7 +9,7 @@ The stack uses a Next.js frontend and a FastAPI backend, with Gemini handling th
 - Drag-and-drop upload for `.pdf` and `.docx` files
 - Custom analysis prompts
 - Health status indicator in the frontend
-- Server-side proxying from Next.js to FastAPI
+- Direct browser-to-API communication
 - Env-based configuration for local and Docker setups
 - Improved validation and clearer request failure messages
 
@@ -20,9 +20,7 @@ The app has two services:
 - `frontend/`: Next.js 16 on Bun
 - `backend/`: FastAPI on Python 3.10 with `uv`
 
-Browser requests never call the backend host directly. The frontend sends requests to its own route handlers at `/api/v1/documents/analyze` and `/health`, and those route handlers proxy the request to the backend using the server-side `BACKEND_URL` env var. That keeps backend addresses out of browser code and makes Docker networking simpler.
-
-In Docker, the frontend should use `http://backend:8000`. For local development, the frontend should use `http://127.0.0.1:8000`.
+The browser calls the backend directly using `NEXT_PUBLIC_API_URL`. In production, that should be the public API domain, such as `https://api-papermind.byte10x.dev`. In local development, it can point to `http://127.0.0.1:8000`.
 
 ## Prerequisites
 
@@ -53,6 +51,10 @@ In Docker, the frontend should use `http://backend:8000`. For local development,
    ```bash
    cp frontend/.env.example frontend/.env
    ```
+   Set the public API origin in `frontend/.env`:
+   ```env
+   NEXT_PUBLIC_API_URL=https://api-papermind.byte10x.dev
+   ```
 
 4. Start the stack:
    ```bash
@@ -61,7 +63,7 @@ In Docker, the frontend should use `http://backend:8000`. For local development,
 
 5. Open `http://localhost:3000`.
 
-The backend is only exposed on the internal Docker network. The only public port in this setup is the frontend on `3000`.
+Because `NEXT_PUBLIC_API_URL` is embedded into the frontend bundle, changing `frontend/.env` requires rebuilding the frontend image.
 
 ## Run Locally Without Docker
 
@@ -83,7 +85,7 @@ The backend is only exposed on the internal Docker network. The only public port
    ```
    Then set:
    ```env
-   BACKEND_URL=http://127.0.0.1:8000
+   NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
    ```
 
 4. Start the frontend:
@@ -101,25 +103,25 @@ The backend is only exposed on the internal Docker network. The only public port
 
 ```env
 GEMINI_API_KEY=your-gemini-api-key
-BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://papermind.byte10x.dev
 ```
 
 ### `frontend/.env` for Docker
 
 ```env
-BACKEND_URL=http://backend:8000
+NEXT_PUBLIC_API_URL=https://api-papermind.byte10x.dev
 ```
 
 ### `frontend/.env.local` for local frontend development
 
 ```env
-BACKEND_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 ```
 
 ## Error Handling
 
 - The frontend validates supported file types and file size before upload.
-- Next.js proxy routes return `503` or `504` when the backend is unavailable or times out.
+- The frontend surfaces backend `detail` messages when the API returns an error.
 - The backend validates MIME type, file size, empty files, unreadable DOCX files, and empty extracted text.
 - Backend errors are converted into consistent JSON responses with a `detail` message.
 
